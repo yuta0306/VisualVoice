@@ -21,6 +21,18 @@ If you find our data or project useful in your research, please cite:
       year = {2021}
     }
 
+### Environment Setup
+
+1. Make docker container from `./dockerfile` and run the container:
+```sh
+$ docker build -t visualvoice .
+$ docker run -it --rm visualvoice
+```
+
+2. Install required libraries with `rye`
+```sh
+$ LLVM_CONFIG=//usr/bin/llvm-config-8 rye sync
+```
 
 ### Demo with the pre-trained models
 1. Download the pre-trained models:
