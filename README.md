@@ -34,6 +34,30 @@ $ docker run -it --rm visualvoice
 $ LLVM_CONFIG=//usr/bin/llvm-config-8 rye sync
 ```
 
+### Preprocessing data
+
+1. Convert `.m2ts` to `.mp4` (if required)
+```sh
+$ bash scripts/m2ts2mp4.sh ../data/ ../data/mp4/
+```
+
+2. Split `.mp4` file
+```sh
+$ rye run split --input ../data/mp4 --output ../data/split --duration 7
+```
+
+3. Preprocess to extract data which include one or more speakers.
+```sh
+$ bash scripts/preprocess_all.sh ../data/split/ ../data/processed/
+$ bash scripts/preprocess_all_2spks.sh ../data/split ../data/processed/
+```
+
+## Postprocessing
+
+```sh
+$ bash scripts/merge.sh ../data/processed/
+```
+
 ### Demo with the pre-trained models
 1. Download the pre-trained models:
 ```
