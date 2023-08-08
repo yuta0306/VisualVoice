@@ -4,7 +4,10 @@ input_dir=$(echo $1 | sed -E 's/\/$//')
 
 for dir in $(ls $1); do
     top=$input_dir/$dir
-    ffmpeg -y -i $top/video_tracked1.mp4 -i $top/speaker1.wav -c:v copy $top/speaker1.mp4 -loglevel fatal
-    ffmpeg -y -i $top/video_tracked2.mp4 -i $top/speaker2.wav -c:v copy $top/speaker2.mp4 -loglevel fatal
+    id=1
+    for video in $(ls $top/ | grep video_tracked); do
+        ffmpeg -y -i $top/$video -i $top/speaker${id}.wav -c:v copy $top/speaker${id}.mp4 -loglevel fatal
+        id=$(($id+1))
+    done
     echo
-done | rye run tqdm --total $(ls $1 | wc -l)
+done | rye run tqdm --total $(ls $1 | wc -l) >> /dev/null

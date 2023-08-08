@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 import ffmpeg
-import joblib
+from tqdm import tqdm
 
 
 def split_file(
@@ -12,19 +12,22 @@ def split_file(
     output_dir: os.PathLike,
     duration: int,
     extension: str = "mp4",
+    ss: int = 1,
+    max_length: int = -1,
 ):
     filepath = Path(filepath)
     output_dir = Path(output_dir)
     output_dir.mkdir(exist_ok=True)
     length = math.ceil(float(ffmpeg.probe(filepath)["streams"][0]["duration"]))
-    cur = 1
     stream_org = ffmpeg.input(filepath)
-    while cur < length:
-        ss = cur
+    if max_length > 0:
+        length = max_length
+    ranges = [(i, i + duration) for i in range(ss, length, duration)]
+    for ss, tt in tqdm(ranges, total=len(list(ranges)), leave=False):
         stream = ffmpeg.output(
             stream_org,
             filename=output_dir
-            / f"{filepath.name.removesuffix(filepath.suffix)}_{cur:03d}-{cur+duration:03d}.{extension}",
+            / f"{filepath.name.removesuffix(filepath.suffix)}_{ss:04d}-{tt:04d}.{extension}",
             ss=ss,
             t=duration,
             f=extension,
@@ -33,8 +36,6 @@ def split_file(
         ffmpeg.run(
             stream, overwrite_output=True, capture_stdout=True, capture_stderr=True
         )
-        cur += duration
-    return
 
 
 def cli():
@@ -43,7 +44,8 @@ def cli():
     parser.add_argument("--input", type=str, default=None)
     parser.add_argument("--output", type=str, required=True)
     parser.add_argument("--duration", type=int, default=7)
-    parser.add_argument("--n_jobs", type=int, default=1)
+    parser.add_argument("--ss", type=int, default=1)
+    parser.add_argument("--max_length", type=int, default=-1)
     args = parser.parse_args()
 
     if args.filepath is None and args.input is None:
@@ -55,15 +57,15 @@ def cli():
         )
         return
 
-    files = Path(args.input).glob("*.mp4")
+    files = list(Path(args.input).glob("*.mp4"))
     try:
-        _ = joblib.Parallel(n_jobs=args.n_jobs)(
-            joblib.delayed(split_file)(
-                filepath,
-                args.output,
-                args.duration,
+        for filepath in tqdm(files, leave=True):
+            split_file(
+                filepath=filepath,
+                output_dir=args.output,
+                duration=args.duration,
+                ss=args.ss,
+                max_length=args.max_length,
             )
-            for filepath in files
-        )
     except KeyboardInterrupt:
         exit(0)

@@ -3,6 +3,7 @@
 input_dir=$(echo $1 | sed -E 's/\/$//')
 
 for name in $(ls $1); do
+    speakers=$(ls $input_dir/$name/ | grep video_tracked | wc -l)
     rye run python testRealVideo.py \
         --mouthroi_root $input_dir/$name/mouthroi/ \
         --facetrack_root $input_dir/$name/faces/ \
@@ -28,7 +29,7 @@ for name in $(ls $1); do
         --reliable_face \
         --audio_normalization \
         --desired_rms 0.7 \
-        --number_of_speakers 2 \
+        --number_of_speakers $speakers \
         --mask_clip_threshold 5 \
         --hop_length 2.55 \
         --lipreading_extract_feature \

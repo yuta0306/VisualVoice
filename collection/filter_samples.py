@@ -1,7 +1,6 @@
 # reference: utils/detectFaces.py
 
 import argparse
-import shutil
 from pathlib import Path
 from warnings import simplefilter
 
@@ -88,23 +87,40 @@ class FaceDetector(object):
         boxes_dic: dict[int, list[list[float]]],
         index: int,
     ) -> None:
-        for spk, box in enumerate(boxes):
+        stores = {}
+        iou = []
+        for k, box in enumerate(boxes):
             face = frame.crop((box[0], box[1], box[2], box[3])).resize((224, 224))
             preds = self.fa.get_landmarks(np.array(face))
-            if index == 0:
-                faces_dic[spk].append(face)
-                landmarks_dic[spk].append(preds)
-                boxes_dic[spk].append(box)
-            else:
+            stores[k] = {"face": face, "preds": preds, "box": box}
+            if index > 0:
                 iou_scores = []
                 for b_index in range(self.number_of_speakers):
                     last_box = boxes_dic[b_index][-1]
                     iou_score = bb_intersection_over_union(box, last_box)
                     iou_scores.append(iou_score)
                 box_index = iou_scores.index(max(iou_scores))
+                iou.append((k, box_index, max(iou_scores)))
                 faces_dic[box_index].append(face)
                 landmarks_dic[box_index].append(preds)
                 boxes_dic[box_index].append(box)
+
+        iou = sorted(iou, key=lambda x: x[2])
+        if len(iou) == 0:
+            iou = [(i, i, 1.0) for i in range(len(boxes))]
+
+        speakers = [i for i in range(len(boxes))]
+        for org, to, _ in iou:
+            if to in speakers:
+                speakers.remove(to)
+                faces_dic[to].append(stores[org]["face"])
+                landmarks_dic[to].append(stores[org]["preds"])
+                boxes_dic[to].append(stores[org]["box"])
+            else:
+                to = speakers.pop(0)
+                faces_dic[to].append(stores[org]["face"])
+                landmarks_dic[to].append(stores[org]["preds"])
+                boxes_dic[to].append(stores[org]["box"])
 
     def __call__(
         self,
@@ -164,11 +180,8 @@ def cli():
     try:
         video = mmcv.VideoReader(video_input_path.as_posix())
     except Exception as e:
-        print(e, "in", output_path.as_posix())
-        print("delete", output_path.as_posix())
-        shutil.rmtree(output_path.as_posix())
-        print("deleted", output_path.as_posix())
-        return
+        print(e, "in VideoReader")
+        exit(1)
 
     print(
         f"Video statistics: WxH = {video.width}x{video.height}, Resolution = {video.resolution}, FPS = {video.fps}"
@@ -188,11 +201,8 @@ def cli():
     try:
         faces_dic, landmarks_dic, boxes_dic = detector(frames=frames)
     except Exception as e:
-        print(e, "in", output_path.as_posix())
-        print("delete", output_path.as_posix())
-        shutil.rmtree(output_path.as_posix())
-        print("deleted", output_path.as_posix())
-        return
+        print(e, "in FaceDetector")
+        exit(1)
 
     try:
         for s in range(args.number_of_speakers):
@@ -216,11 +226,10 @@ def cli():
                 video_tracked.write(cv2.cvtColor(np.array(frame), cv2.COLOR_RGB2BGR))
             video_tracked.release()
     except Exception as e:
-        print(e, "in", output_path.as_posix())
-        print("delete", output_path.as_posix())
-        shutil.rmtree(output_path.as_posix())
-        print("deleted", output_path.as_posix())
-        return
+        print(e, "in drawing landmarks")
+        for s in range(args.number_of_speakers):
+            print(len(faces_dic[s]), len(landmarks_dic[s]), len(boxes_dic[s]))
+        exit(1)
 
     # Save landmarks
     try:
@@ -243,11 +252,8 @@ def cli():
                 speaker_video.write(cv2.cvtColor(np.array(frame), cv2.COLOR_RGB2BGR))
             speaker_video.release()
     except Exception as e:
-        print(e, "in", output_path.as_posix())
-        print("delete", output_path.as_posix())
-        shutil.rmtree(output_path.as_posix())
-        print("deleted", output_path.as_posix())
-        return
+        print(e, "in writing vedeo")
+        exit(1)
 
     # Output video path
     try:
@@ -260,7 +266,6 @@ def cli():
                 csvfile.write("speaker" + str(i + 1) + ",0\n")
     except Exception as e:
         print(e, "in", output_path.as_posix())
-        print("delete", output_path.as_posix())
-        shutil.rmtree(output_path.as_posix())
-        print("deleted", output_path.as_posix())
-        return
+        exit(1)
+
+    exit(0)
