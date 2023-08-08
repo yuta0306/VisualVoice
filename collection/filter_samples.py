@@ -86,6 +86,7 @@ class FaceDetector(object):
         landmarks_dic: dict[int, list[list[float]]],
         boxes_dic: dict[int, list[list[float]]],
         index: int,
+        threshold: float = 0.2,
     ) -> None:
         stores = {}
         iou = []
@@ -110,17 +111,22 @@ class FaceDetector(object):
             iou = [(i, i, 1.0) for i in range(len(boxes))]
 
         speakers = [i for i in range(len(boxes))]
-        for org, to, _ in iou:
+        for org, to, score in iou:
             if to in speakers:
                 speakers.remove(to)
-                faces_dic[to].append(stores[org]["face"])
-                landmarks_dic[to].append(stores[org]["preds"])
-                boxes_dic[to].append(stores[org]["box"])
+                if score < threshold:
+                    faces_dic[to].append(faces_dic[to][-1])
+                    landmarks_dic[to].append(landmarks_dic[to][-1])
+                    boxes_dic[to].append(boxes_dic[to][-1])
+                else:
+                    faces_dic[to].append(stores[org]["face"])
+                    landmarks_dic[to].append(stores[org]["preds"])
+                    boxes_dic[to].append(stores[org]["box"])
             else:
                 to = speakers.pop(0)
-                faces_dic[to].append(stores[org]["face"])
-                landmarks_dic[to].append(stores[org]["preds"])
-                boxes_dic[to].append(stores[org]["box"])
+                faces_dic[to].append(faces_dic[to][-1])
+                landmarks_dic[to].append(landmarks_dic[to][-1])
+                boxes_dic[to].append(boxes_dic[to][-1])
 
     def __call__(
         self,
